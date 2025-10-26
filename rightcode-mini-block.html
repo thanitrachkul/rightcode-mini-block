@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RightCode Mini Block V25</title> <!-- V25 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root { --rc-bg:#e5e7eb; --rc-panel:#f3f4f6; }
+    body{font-family:'Sarabun','Inter',system-ui,-apple-system,sans-serif;background:var(--rc-bg)}
+    .app{height:100vh;display:flex;flex-direction:column}
+    .col{display:flex;flex-direction:column;height:100%}
+    .scroll{overflow:auto}
+
+    .scroll::-webkit-scrollbar { width: 8px; }
+    .scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+    .scroll::-webkit-scrollbar-thumb { background: #bdbdbd; border-radius: 10px; }
+    .scroll::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
+
+    /* blocks */
+    .palette-block{margin-bottom: 8px; display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;border-radius:.5rem;font-weight:600;color:#fff;cursor:grab}
+    .script-block{margin-bottom: 4px; display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;border-radius:.5rem;font-weight:600;color:#fff;cursor:grab}
+    .palette-block:active,.script-block:active{cursor:grabbing}
+    .script-block{position:relative;box-shadow:inset 0 0 0 1px rgb(0 0 0 / .05)}
+    .script-block.active{outline:3px solid #fbbf24}
+
+    .script-block[data-command="repeat_start"] { border-left: 5px solid rgba(0,0,0,0.2); border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+    .script-block[data-command="loop_end"] { border-right: 5px solid rgba(0,0,0,0.2); border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+
+    .indent-1 { margin-left: 30px !important; }
+    .indent-2 { margin-left: 60px !important; }
+    .indent-3 { margin-left: 90px !important; }
+
+    .block-input{width:56px;text-align:center;border:1px solid #9ca3af;border-radius:.375rem;color:#111;padding:2px 0;font-weight:600}
+    .remove-btn{position:absolute;right:.5rem;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:9999px;background:rgba(0,0,0,.25);display:grid;place-items:center;color:#fff;font-weight:700}
+
+    .drag-over-indicator{height:6px;border-radius:9999px;background:#2563eb;margin:.125rem 0}
+
+    #stage-wrap{position:relative;width:100%;padding-top:100%}
+    #grid-canvas,#sprite-canvas{position:absolute;inset:0;border-radius:.75rem}
+    #sprite-canvas{pointer-events:none}
+
+    .faint{opacity:.35}
+
+    #mute-btn {
+        position: absolute;
+        top: 50%;
+        right: 1rem;
+        transform: translateY(-50%);
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1.25rem;
+        transition: background 0.2s;
+    }
+     #mute-btn:hover { background: rgba(255, 255, 255, 0.3); }
+
+     /* V25: Notification Area Style */
+    #notification-area {
+        background-color: #fee2e2; /* red-100 */
+        color: #dc2626; /* red-600 */
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.375rem; /* rounded-md */
+        margin-bottom: 0.5rem; /* mb-2 */
+        font-weight: 600;
+        text-align: center;
+        display: none; /* Hidden by default */
+        border: 1px solid #fca5a5; /* red-300 */
+        transition: opacity 0.3s ease-out;
+    }
+     #notification-area.fade-out {
+         opacity: 0;
+     }
+
+
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="bg-gray-800 text-white px-4 py-2 shadow grid place-items-center relative">
+      <div class="text-center">
+        <h1 class="text-2xl font-bold">RightCode Mini Block <span class="text-sm font-normal align-top">V25</span></h1> <!-- V25 -->
+        <p class="text-xs opacity-80">(โจทย์: เก็บฟืนให้ครบ กลับบ้าน แล้วก่อไฟ)</p>
+      </div>
+       <button id="mute-btn">🔈</button>
+    </header>
+
+    <!-- 3 Columns -->
+    <div class="flex-1 grid grid-cols-12 gap-3 p-3">
+      <!-- Palette -->
+      <section class="col col-span-12 md:col-span-3 bg-[var(--rc-panel)] rounded-xl shadow p-3">
+        <h2 class="text-lg font-bold text-gray-800 mb-2">คลังบล็อก</h2>
+        <div id="palette" class="scroll pr-1">
+          <div class="text-amber-600 font-bold mb-1">เหตุการณ์ (Events)</div>
+          <div draggable="true" data-command="when_run" class="palette-block bg-yellow-400 text-black">🚩 เมื่อทำงาน</div>
+
+          <div class="text-blue-600 font-bold mt-3 mb-1">การเคลื่อนไหว (Motion)</div>
+          <div draggable="true" data-command="move" data-value="1" class="palette-block bg-blue-500">➡️ เคลื่อนที่ 1 ช่อง</div>
+          <div draggable="true" data-command="turnRight" data-value="90" class="palette-block bg-blue-500">↻ หันขวา 90°</div>
+          <div draggable="true" data-command="turnLeft" data-value="90" class="palette-block bg-blue-500">↺ หันซ้าย 90°</div>
+
+          <div class="text-orange-600 font-bold mt-3 mb-1">ลูป (Loop)</div>
+          <div draggable="true" data-command="repeat_start" data-value="4" class="palette-block bg-orange-400">🔁 ทำซ้ำ <input type="number" class="block-input" value="4"> รอบ</div>
+          <div draggable="true" data-command="loop_end" class="palette-block bg-orange-600">🏁 จบการวนซ้ำ</div>
+
+          <div class="text-green-600 font-bold mt-3 mb-1">การกระทำ (Actions)</div>
+          <div draggable="true" data-command="collectWood" class="palette-block bg-green-500">🪵 เก็บฟืน</div>
+          <div draggable="true" data-command="makeFire" class="palette-block bg-green-500">🔥 ก่อไฟ</div>
+        </div>
+      </section>
+
+      <!-- Script Area -->
+      <section class="col col-span-12 md:col-span-5 bg-[var(--rc-panel)] rounded-xl shadow p-3 border border-gray-200">
+        <div class="flex items-baseline justify-between mb-2">
+          <h2 class="text-lg font-bold text-gray-800">พื้นที่สคริปต์</h2>
+          <div id="block-count" class="text-sm text-gray-600">(0 บล็อก)</div>
+        </div>
+
+        <div class="flex items-center gap-2 mb-2">
+          <button id="run-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">▶ เริ่ม</button>
+          <button id="stop-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">■ หยุด</button>
+          <button id="clear-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">✕ ล้างสคริปต์</button>
+          <button id="new-btn" class="ml-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">🧩 สุ่มโจทย์</button>
+        </div>
+        <div id="script" class="scroll bg-white rounded-xl shadow-inner flex-1 p-3"></div>
+      </section>
+
+      <!-- Stage -->
+      <section class="col col-span-12 md:col-span-4 bg-[var(--rc-panel)] rounded-xl shadow p-3">
+        <h2 class="text-lg font-bold text-gray-800 mb-2">เวที</h2>
+        <!-- V25: Notification Area -->
+        <div id="notification-area"></div>
+        <div id="stage-wrap" class="bg-white rounded-xl shadow border border-gray-300 mb-2">
+          <canvas id="grid-canvas"></canvas>
+          <canvas id="sprite-canvas"></canvas>
+        </div>
+        <div class="text-xs text-gray-700 bg-gray-100 border border-gray-300 rounded-lg p-3">
+          <b>กติกา</b>
+          <ol class="list-decimal list-inside mt-1 space-y-1">
+            <li>พา <b>🙂 คน</b> ไปเก็บ <b>🪵 ฟืน</b> ให้ครบ 2 กอง</li>
+            <li>กลับไปที่ <b>🏠 บ้าน</b></li>
+            <li>ใช้บล็อก <b>🔥 ก่อไฟ</b> ที่หน้าบ้านเพื่อชนะ</li>
+          </ol>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+  // ======== Core Config (6x6 grid, centered) ========
+  const GRID_SIZE_N = 6;
+  const PADDING = 28;
+  const WOOD_COUNT = 2;
+  const CELL_LABEL_OPACITY = 0.25;
+  const NOTIFICATION_TIMEOUT = 3000; // V25: 3 seconds for notification
+
+  // State
+  const script = [];
+  let isRunning = false;
+  let activeIndex = -1;
+  let audioStarted = false;
+  let isMuted = false;
+  let notificationTimer = null; // V25
+
+  // Game state (grid-based)
+  let start = {c: 0, r: 0};
+  let home  = {c: GRID_SIZE_N-1, r: 0};
+  let rocks = [];
+  let woods = [];
+  let woodPicked = [];
+
+  // Sprite
+  const sprite = { c: 0, r: 0, dir: 1, message: '', msgT: 0 };
+
+  // Elements
+  const palette = document.querySelector('#palette');
+  const scriptBox = document.querySelector('#script');
+  const runBtn = document.querySelector('#run-btn');
+  const stopBtn = document.querySelector('#stop-btn');
+  const clearBtn = document.querySelector('#clear-btn');
+  const newBtn = document.querySelector('#new-btn');
+  const blockCount = document.querySelector('#block-count');
+  const gridCanvas = document.querySelector('#grid-canvas');
+  const g = gridCanvas.getContext('2d');
+  const spriteCanvas = document.querySelector('#sprite-canvas');
+  const s = spriteCanvas.getContext('2d');
+  const stageWrap = document.querySelector('#stage-wrap');
+  const muteBtn = document.querySelector('#mute-btn');
+  const notificationArea = document.querySelector('#notification-area'); // V25
+
+  // ======== Audio Setup (V24) ========
+  const synth = new Tone.Synth({
+      oscillator: { type: "triangle" },
+      envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 0.5 }
+  }).toDestination();
+  synth.volume.value = -12;
+
+  const melodyLoop = new Tone.Sequence((time, note) => {
+    synth.triggerAttackRelease(note, "8n", time);
+  }, ["C4", "E4", "G4", "C5"], "4n").start(0);
+  melodyLoop.loop = true;
+
+  async function startAudio() {
+      if (!audioStarted && Tone.context.state !== 'running') {
+          try {
+              await Tone.start();
+              Tone.Transport.start();
+              audioStarted = true;
+              console.log("Audio Context Started");
+          } catch (e) { console.error("Audio context start failed:", e); }
+      } else if (!audioStarted && Tone.context.state === 'running'){
+          Tone.Transport.start();
+          audioStarted = true;
+          console.log("Transport Started");
+      }
+  }
+  document.body.addEventListener('click', startAudio, { once: true });
+  document.body.addEventListener('touchstart', startAudio, { once: true });
+
+  muteBtn.addEventListener('click', async () => {
+      await startAudio();
+      isMuted = !isMuted;
+      Tone.Destination.volume.value = isMuted ? -Infinity : 0;
+      muteBtn.textContent = isMuted ? '🔇' : '🔈';
+  });
+  Tone.Destination.volume.value = isMuted ? -Infinity : 0;
+  muteBtn.textContent = isMuted ? '🔇' : '🔈';
+
+  // ======== V25: Notification Function ========
+  function showNotification(message) {
+      clearTimeout(notificationTimer); // Clear previous timer if any
+      notificationArea.textContent = message;
+      notificationArea.style.display = 'block';
+      notificationArea.classList.remove('fade-out'); // Ensure visible
+      notificationArea.style.opacity = '1';
+
+      // Set timeout to fade out and hide
+      notificationTimer = setTimeout(() => {
+          notificationArea.classList.add('fade-out');
+          // Hide completely after fade out transition (300ms)
+           setTimeout(() => {
+                if (notificationArea.classList.contains('fade-out')) { // Check if still fading out
+                     notificationArea.style.display = 'none';
+                }
+           }, 300);
+      }, NOTIFICATION_TIMEOUT);
+  }
+
+
+  // ======== Layout / Canvas ========
+  function resizeCanvases(){
+    const w = stageWrap.clientWidth;
+    gridCanvas.width = w; gridCanvas.height = w;
+    spriteCanvas.width = w; spriteCanvas.height = w;
+    drawGrid();
+  }
+  new ResizeObserver(resizeCanvases).observe(stageWrap);
+
+  function cellSize(){
+    const canvasWidth = gridCanvas.width || stageWrap.clientWidth;
+    return Math.max(1, (canvasWidth - PADDING*2)/GRID_SIZE_N);
+  }
+
+  // ======== Drawing (Mostly unchanged) ========
+  function drawGrid(){ /* ... unchanged ... */
+    const size = cellSize();
+    g.clearRect(0,0,gridCanvas.width, gridCanvas.height);
+    g.fillStyle = '#ffffff';
+    g.fillRect(0,0,gridCanvas.width, gridCanvas.height);
+    g.strokeStyle = '#cbd5e1';
+    g.lineWidth = 1;
+    const letters = Array.from({length:GRID_SIZE_N},(_,i)=>String.fromCharCode(65+i));
+
+    for(let r=0;r<GRID_SIZE_N;r++){
+      for(let c=0;c<GRID_SIZE_N;c++){
+        const x = PADDING + c*size;
+        const y = PADDING + r*size;
+        g.strokeRect(x,y,size,size);
+        g.save();
+        g.globalAlpha = CELL_LABEL_OPACITY;
+        g.fillStyle = '#111827';
+        g.font = `${Math.floor(size*0.22)}px Inter`;
+        g.textAlign = 'left'; g.textBaseline='top';
+        g.fillText(`${letters[c]}${r+1}`, x+4, y+2);
+        g.restore();
+      }
+    }
+    rocks.forEach(({c,r})=>{
+      const x = PADDING + c*size; const y = PADDING + r*size;
+      g.fillStyle = '#4b5563'; g.strokeStyle='#111827';
+      g.fillRect(x+2,y+2,size-4,size-4); g.strokeRect(x+2,y+2,size-4,size-4);
+    });
+    drawHouse(PADDING + (home.c+0.5)*size, PADDING + (home.r+0.5)*size, size*0.6);
+    woods.forEach((pos,i)=>{
+      if(woodPicked[i]) return;
+      drawWood(PADDING + (pos.c+0.5)*size, PADDING + (pos.r+0.5)*size, size*0.45);
+    });
+  }
+  function drawHouse(cx, cy, ssz){ /* ... unchanged ... */
+    g.save();
+    g.translate(cx,cy);
+    g.fillStyle = '#a78bfa'; g.strokeStyle='#6d28d9';
+    g.lineWidth = 2;
+    g.fillRect(-ssz*0.6, -ssz*0.2, ssz*1.2, ssz*0.8);
+    g.strokeRect(-ssz*0.6, -ssz*0.2, ssz*1.2, ssz*0.8);
+    g.beginPath();
+    g.moveTo(-ssz*0.7, -ssz*0.2);
+    g.lineTo(0, -ssz*0.8);
+    g.lineTo(ssz*0.7, -ssz*0.2);
+    g.closePath();
+    g.fillStyle='#f43f5e'; g.strokeStyle='#be123c';
+    g.fill(); g.stroke();
+    g.fillStyle='#fff';
+    g.fillRect(-ssz*0.15, ssz*0.1, ssz*0.3, ssz*0.5);
+    g.restore();
+  }
+  function drawWood(cx, cy, ssz){ /* ... unchanged ... */
+    g.save(); g.translate(cx,cy);
+    g.fillStyle='#8d6e63'; g.strokeStyle='#5d4037'; g.lineWidth=2;
+    g.beginPath(); roundRect(g, -ssz, -ssz*0.35, ssz*2, ssz*0.7, 6); g.fill(); g.stroke();
+    g.rotate(Math.PI/4);
+    g.beginPath(); roundRect(g, -ssz, -ssz*0.25, ssz*2, ssz*0.5, 6); g.fill(); g.stroke();
+    g.restore();
+  }
+  function roundRect(ctx,x,y,w,h,r){ /* ... unchanged ... */ ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+  function drawSprite(){ /* ... unchanged ... */
+    const size = cellSize();
+    const validSize = Math.max(1, size);
+    s.clearRect(0,0,spriteCanvas.width, spriteCanvas.height);
+    const cx = PADDING + (sprite.c+0.5)*size;
+    const cy = PADDING + (sprite.r+0.5)*size;
+    s.save(); s.translate(cx,cy);
+    s.fillStyle = '#fde047'; s.strokeStyle='#111827'; s.lineWidth=2;
+    s.beginPath(); s.arc(0,0, validSize*0.22, 0, Math.PI*2); s.fill(); s.stroke();
+    s.fillStyle='#111827';
+    s.beginPath(); s.arc(-validSize*0.07,-validSize*0.07, validSize*0.035, 0, Math.PI*2); s.fill();
+    s.beginPath(); s.arc(validSize*0.07,-validSize*0.07, validSize*0.035, 0, Math.PI*2); s.fill();
+    s.beginPath(); s.arc(0,validSize*0.06, validSize*0.10, .2*Math.PI,.8*Math.PI); s.stroke();
+    s.save(); s.rotate([0,Math.PI/2,Math.PI,-Math.PI/2][sprite.dir]);
+    s.fillStyle='#3b82f6'; s.strokeStyle='#1d4ed8';
+    s.beginPath(); s.moveTo(0,-validSize*0.28); s.lineTo(validSize*0.08,-validSize*0.38); s.lineTo(-validSize*0.08,-validSize*0.38); s.closePath(); s.fill(); s.stroke();
+    s.restore();
+    s.restore();
+    requestAnimationFrame(drawSprite);
+  }
+
+  // ======== Puzzle generation (Unchanged) ========
+  function newPuzzle(){ /* ... unchanged ... */
+    start = { c: 1+Math.floor(Math.random()*(GRID_SIZE_N-3)), r: 1+Math.floor(Math.random()*(GRID_SIZE_N-3)) };
+    home = { c: GRID_SIZE_N-1, r: Math.floor(Math.random()*GRID_SIZE_N) };
+    if (home.c === start.c && home.r === start.r) { home.r = (home.r + 1) % GRID_SIZE_N; }
+    rocks = [];
+    const rockCount = 5;
+    while(rocks.length<rockCount){
+      const pos = { c: Math.floor(Math.random()*GRID_SIZE_N), r: Math.floor(Math.random()*GRID_SIZE_N) };
+      if((pos.c===start.c && pos.r===start.r) || (pos.c===home.c && pos.r===home.r)) continue;
+      if(rocks.some(o=>o.c===pos.c && o.r===pos.r)) continue;
+      rocks.push(pos);
+    }
+    woods = []; woodPicked = new Array(WOOD_COUNT).fill(false);
+    while(woods.length<WOOD_COUNT){
+      const pos = { c: Math.floor(Math.random()*GRID_SIZE_N), r: Math.floor(Math.random()*GRID_SIZE_N) };
+      if((pos.c===start.c && pos.r===start.r) || (pos.c===home.c && pos.r===home.r)) continue;
+      if(rocks.some(o=>o.c===pos.c && o.r===pos.r)) continue;
+      if(woods.some(o=>o.c===pos.c && o.r===pos.r)) continue;
+      woods.push(pos);
+    }
+    resetSprite();
+  }
+
+  // ======== Script UI (Unchanged render logic) ========
+  function renderScript(){ /* ... unchanged indent logic from V22 ... */
+    scriptBox.innerHTML='';
+    blockCount.textContent = `(${script.length} บล็อก)`;
+    let indentLevel = 0;
+
+    script.forEach((b,i)=>{
+      const div = document.createElement('div');
+
+      if (b.command === 'loop_end') { indentLevel = Math.max(0, indentLevel - 1); }
+      if (indentLevel > 0) { div.classList.add(`indent-${Math.min(indentLevel, 3)}`); }
+
+      div.className = 'script-block ' + {
+        when_run:'bg-yellow-400 text-black',
+        move:'bg-blue-500',turnRight:'bg-blue-500',turnLeft:'bg-blue-500',
+        repeat_start:'bg-orange-400',loop_end:'bg-orange-600',
+        collectWood:'bg-green-500',makeFire:'bg-green-500'
+      }[b.command];
+       div.dataset.command = b.command;
+
+      if(i===activeIndex) div.classList.add('active');
+      div.draggable = b.command!=='when_run';
+      div.dataset.id = b.id;
+
+      let html='';
+      if(b.command==='when_run') html='🚩 เมื่อทำงาน';
+      if(b.command==='move') html=`➡️ เคลื่อนที่ 1 ช่อง`;
+      if(b.command==='turnRight') html=`↻ หันขวา 90°`;
+      if(b.command==='turnLeft') html=`↺ หันซ้าย 90°`;
+      if(b.command==='repeat_start') html=`🔁 ทำซ้ำ <input type="number" class="block-input" value="${b.value}" data-i="${i}"> รอบ`;
+      if(b.command==='loop_end') html=`🏁 จบการวนซ้ำ`;
+      if(b.command==='collectWood') html='🪵 เก็บฟืน';
+      if(b.command==='makeFire') html='🔥 ก่อไฟ';
+      div.innerHTML = html;
+
+      if (b.command === 'repeat_start') { indentLevel++; }
+
+      if(b.command!=='when_run' && b.command!=='loop_end'){
+        const rm=document.createElement('button');
+        rm.className='remove-btn'; rm.textContent='✕';
+        rm.onclick=()=>{
+            if (b.command === 'repeat_start') {
+                const endIdx = findLoopEnd(i + 1, b.id);
+                if (endIdx < script.length && script[endIdx].pairId === b.id) {
+                    script.splice(endIdx, 1);
+                }
+            }
+            script.splice(i,1);
+            renderScript();
+        };
+        div.appendChild(rm);
+      }
+      scriptBox.appendChild(div);
+    });
+  }
+
+  // drag from palette & scriptBox (Unchanged)
+  let dragged=null; let fromPalette=false; let dragIndex=-1;
+  let lastIndicatorElement = null;
+  palette.addEventListener('dragstart',e=>{ /* ... unchanged ... */
+    const el=e.target.closest('.palette-block'); if(!el) return;
+    fromPalette=true;
+    const input = el.querySelector('.block-input');
+    const value = input ? Number(input.value) : (Number(el.dataset.value)||0);
+    dragged={command:el.dataset.command, value: value};
+    lastIndicatorElement = null;
+  });
+  scriptBox.addEventListener('dragstart',e=>{ /* ... unchanged ... */
+    const blockElement = e.target.closest('.script-block');
+    if(!blockElement) return;
+    const idx=[...scriptBox.children].indexOf(blockElement); if(idx<0) return;
+
+    if(script[idx].command==='when_run'){e.preventDefault();return;}
+    fromPalette=false; dragIndex=idx; dragged=script[idx];
+    lastIndicatorElement = null;
+    setTimeout(() => blockElement.style.opacity = '0.5', 0);
+  });
+  scriptBox.addEventListener('dragover',e=>{ /* ... unchanged ... */
+    e.preventDefault();
+    const currentIndicator = document.querySelector('.drag-over-indicator');
+    const children = [...scriptBox.children].filter(c => c !== currentIndicator && c.style.opacity !== '0.5');
+    const y=e.clientY;
+    let afterElement = null;
+    for(let i=0;i<children.length;i++){
+      const box=children[i].getBoundingClientRect();
+      if(y<box.top+box.height/2){ afterElement=children[i]; break; }
+    }
+
+    if (afterElement !== lastIndicatorElement) {
+        if(currentIndicator) currentIndicator.remove();
+        const bar=document.createElement('div'); bar.className='drag-over-indicator';
+        if(afterElement === null) scriptBox.appendChild(bar);
+        else scriptBox.insertBefore(bar, afterElement);
+        lastIndicatorElement = afterElement;
+    }
+  });
+  document.addEventListener('dragend', (e) => { /* ... unchanged ... */
+       const draggingElement = scriptBox.querySelector('[style*="opacity: 0.5"]');
+       if (draggingElement) draggingElement.style.opacity = '';
+      const currentIndicator = document.querySelector('.drag-over-indicator');
+      if (currentIndicator) currentIndicator.remove();
+      dragged = null;
+      fromPalette = false;
+      dragIndex = -1;
+      lastIndicatorElement = null;
+  });
+  scriptBox.addEventListener('dragleave',(e)=>{ /* ... unchanged ... */
+    if (!scriptBox.contains(e.relatedTarget)) {
+      const currentIndicator = document.querySelector('.drag-over-indicator');
+      if(currentIndicator) currentIndicator.remove();
+      lastIndicatorElement = null;
+    }
+  });
+  scriptBox.addEventListener('drop',e=>{ /* ... unchanged ... */
+    e.preventDefault();
+    const bar=document.querySelector('.drag-over-indicator');
+    let insertAt = script.length;
+
+     if (bar) {
+        let elementBeforeBar = bar.previousElementSibling;
+         while(elementBeforeBar && elementBeforeBar.style.opacity === '0.5') {
+            elementBeforeBar = elementBeforeBar.previousElementSibling;
+         }
+        if (elementBeforeBar && elementBeforeBar.dataset.id) {
+           const elementId = elementBeforeBar.dataset.id;
+           const elementIndex = script.findIndex(b => b.id === elementId);
+           if (elementIndex > -1) { insertAt = elementIndex + 1; }
+           else { insertAt = [...scriptBox.children].filter(c=>c.classList.contains('script-block') && !c.style.opacity).indexOf(elementBeforeBar) + 1; }
+        } else { insertAt = 0; }
+        bar.remove();
+     }
+
+
+    if (script.length > 0 && script[0].command === 'when_run' && insertAt === 0) { insertAt = 1; }
+
+    if(fromPalette){
+      if(dragged.command==='when_run') {
+          if (script.length > 0 && script[0].command === 'when_run') { renderScript(); return; }
+          else { insertAt = 0; }
+      }
+      if(script.length===0 && dragged.command!=='when_run'){ script.unshift({id:uid(),command:'when_run'}); insertAt=1; }
+
+      const newBlock = {id:uid(),command:dragged.command,value:dragged.value||0};
+      script.splice(insertAt,0, newBlock);
+
+      if (dragged.command === 'repeat_start') {
+          script.splice(insertAt + 1, 0, {id:uid(), command:'loop_end', pairId: newBlock.id});
+      }
+
+    }else{
+        const [item]=script.splice(dragIndex,1);
+        if(dragIndex < insertAt) insertAt--;
+        script.splice(insertAt,0,item);
+
+      if (item.command === 'repeat_start') {
+          let oldEndIdx = -1;
+          const originalScriptState = [...script];
+          originalScriptState.splice(insertAt, 1);
+          let currentDragIndex = dragIndex;
+          if (dragIndex < insertAt) currentDragIndex++;
+
+          let nest = 0;
+          for(let k=currentDragIndex+1; k < originalScriptState.length + 1; k++){
+               let checkIdx = k > currentDragIndex ? k-1 : k;
+               if(checkIdx >= originalScriptState.length) break;
+
+               if(originalScriptState[checkIdx].command === 'repeat_start') nest++;
+               else if (originalScriptState[checkIdx].command === 'loop_end'){
+                  if (originalScriptState[checkIdx].pairId === item.id && nest === 0) {
+                     oldEndIdx = checkIdx;
+                     if (checkIdx >= currentDragIndex) oldEndIdx++;
+                     break;
+                  }
+                  if (nest > 0) nest--;
+              }
+          }
+
+
+          if (oldEndIdx > -1 && oldEndIdx < script.length) {
+              const [endBlock] = script.splice(oldEndIdx, 1);
+               let nestedBlockCount = 0;
+               let nestLevel = 0;
+               for (let k = insertAt + 1; k < script.length; k++) {
+                   if (script[k].command === 'repeat_start') nestLevel++;
+                   else if (script[k].command === 'loop_end') {
+                       if (nestLevel === 0) break;
+                       nestLevel--;
+                   }
+                   nestedBlockCount++;
+               }
+               let newEndIdx = insertAt + 1 + nestedBlockCount;
+
+
+              script.splice(newEndIdx, 0, endBlock);
+          } else {
+              console.warn("Could not reliably move loop_end block for", item.id);
+               const endMissing = !script.some(b => b.command === 'loop_end' && b.pairId === item.id);
+               if(endMissing) {
+                   let nestedBlockCount = 0;
+                   let nestLevel = 0;
+                   for (let k = insertAt + 1; k < script.length; k++) {
+                       if (script[k].command === 'repeat_start') nestLevel++;
+                       else if (script[k].command === 'loop_end') {
+                           if (nestLevel === 0) break;
+                           nestLevel--;
+                       }
+                       nestedBlockCount++;
+                   }
+                   let newEndIdx = insertAt + 1 + nestedBlockCount;
+                   script.splice(newEndIdx, 0, {id:uid(), command:'loop_end', pairId: item.id});
+                   console.log("Re-added missing loop_end for", item.id);
+               }
+          }
+      }
+    }
+    renderScript();
+    lastIndicatorElement = null;
+    const draggingElement = scriptBox.querySelector('[style*="opacity: 0.5"]');
+    if (draggingElement) draggingElement.style.opacity = '';
+  });
+
+  // input change
+  scriptBox.addEventListener('change',e=>{
+    if(!e.target.classList.contains('block-input')) return;
+    const i=Number(e.target.dataset.i);
+     if (i >= 0 && i < script.length) {
+        script[i].value=Number(e.target.value)||0;
+     }
+    const paletteBlock = e.target.closest('.palette-block');
+    if (paletteBlock) { paletteBlock.dataset.value = e.target.value; }
+  });
+
+  // buttons
+  clearBtn.onclick=()=>{ if(isRunning) return; script.length=1; renderScript(); resetSprite(); };
+  newBtn.onclick=()=>{ if(isRunning) return; script.length=1; renderScript(); newPuzzle(); };
+
+  runBtn.onclick=async()=>{
+    if(isRunning) return; if(script.length===0 || script[0].command!=='when_run'){
+        showNotification('ผิดพลาด: ไม่พบบล็อก "เมื่อทำงาน"'); // V25
+        return;
+    }
+    await startAudio();
+    resetSprite(); isRunning=true; activeIndex=-1; renderScript();
+    const runResult = await runBlocks(1, script.length);
+    if (runResult !== 'stopped') { activeIndex = -1; renderScript(); }
+    isRunning=false;
+  };
+  stopBtn.onclick=()=>{ isRunning=false; activeIndex=-1; renderScript(); };
+
+  function resetSprite(){ sprite.c=start.c; sprite.r=start.r; sprite.dir=1; woodPicked=woodPicked.map(()=>false); drawGrid(); }
+
+  // ======== Execute ========
+  async function runBlocks(from,to){
+    let status = 'completed';
+    for(let i=from;i<to;i++){
+      if(!isRunning) { status = 'stopped'; break; }
+      activeIndex=i; renderScript();
+      const b=script[i];
+      if (!b) continue;
+
+      let moveResult = 'completed';
+      if(b.command==='move') moveResult = await moveForward(1);
+      if (moveResult === 'stopped') { status = 'stopped'; break; }
+
+      if(b.command==='turnRight') sprite.dir=(sprite.dir+1)%4;
+      if(b.command==='turnLeft') sprite.dir=(sprite.dir+3)%4;
+      if(b.command==='collectWood') collectWood();
+      if(b.command==='makeFire'){
+          // V25: Use notification instead of alert
+          if(checkWin()) {
+              showNotification('สำเร็จ! คุณเก็บฟืนครบและก่อไฟหน้าบ้านแล้ว 🎉');
+              isRunning=false; status = 'stopped'; break;
+          } else {
+              showNotification('ยังไม่พร้อม! ต้องเก็บฟืนให้ครบและไปที่บ้านก่อนนะ');
+              isRunning=false; status = 'stopped'; break;
+          }
+      }
+      if(b.command==='repeat_start'){
+        const times=Math.max(0,Number(b.value)||0);
+        const end=findLoopEnd(i+1, b.id);
+        for(let t=0;t<times;t++){
+             if(!isRunning) { status = 'stopped'; break; }
+             const loopResult = await runBlocks(i+1,end);
+             if (loopResult === 'stopped') { status = 'stopped'; break; }
+        }
+        if (status === 'stopped') break;
+        // V25: Ensure 'i' is correctly set after loop, prevent infinite loop if end not found
+        i = (end < script.length) ? end : script.length - 1;
+      }
+    }
+    return status;
+  }
+
+  function findLoopEnd(startIdx, pairId = null){ /* ... unchanged ... */
+    let nestLevel = 0;
+    for(let k = startIdx; k < script.length; k++) {
+        if (!script[k]) continue;
+        if(script[k].command === 'repeat_start') {
+            if (!pairId || script[k].id !== pairId) {
+               nestLevel++;
+            }
+        } else if(script[k].command === 'loop_end') {
+            if (pairId && script[k].pairId === pairId) {
+                if (nestLevel === 0) return k;
+            } else if (!pairId && nestLevel === 0) {
+                 return k;
+            }
+
+            if (nestLevel > 0) nestLevel--;
+        }
+    }
+    return script.length;
+  }
+
+
+  async function moveForward(steps){
+    for(let sstep=0;sstep<steps;sstep++){
+      if (!isRunning) return 'stopped';
+      let nc=sprite.c, nr=sprite.r;
+      if(sprite.dir===0) nr--;
+      if(sprite.dir===1) nc++;
+      if(sprite.dir===2) nr++;
+      if(sprite.dir===3) nc--;
+      if(nc<0||nr<0||nc>=GRID_SIZE_N||nr>=GRID_SIZE_N) {
+          showNotification('โอ๊ะ! ชนขอบเวที 💥'); // V25
+          isRunning=false; return 'stopped';
+      }
+      if(rocks.some(o=>o.c===nc&&o.r===nr)) {
+          showNotification('โอ๊ะ! ชนก้อนหิน 🧱'); // V25
+          isRunning=false; return 'stopped';
+      }
+      sprite.c=nc; sprite.r=nr;
+      await delay(200);
+    }
+    return 'completed';
+  }
+  function collectWood(){ /* ... unchanged ... */
+    woods.forEach((pos,i)=>{ if(!woodPicked[i] && pos.c===sprite.c && pos.r===sprite.r) woodPicked[i]=true; });
+    drawGrid();
+  }
+  function checkWin(){ /* ... unchanged ... */
+    const all=woodPicked.every(Boolean);
+    const atHome=(sprite.c===home.c && sprite.r===home.r);
+    return all && atHome;
+  }
+
+  // helpers
+  const delay = ms=>new Promise(r=>setTimeout(r,ms));
+  const uid = ()=>`${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
+  // Init
+  script.push({id:uid(), command:'when_run'});
+  renderScript();
+  newPuzzle();
+  resizeCanvases();
+  drawSprite();
+  </script>
+</body>
+</html>
+
